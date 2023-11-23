@@ -2,6 +2,7 @@ const userModel = require("../models/userModel");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const doctorModel = require("../models/doctorModel");
+const mongoose = require("mongoose");
 
 //register callback
 const registerController = async (req, res) => {
@@ -58,21 +59,36 @@ const loginController = async (req, res) => {
 
 const authController = async (req, res) => {
   try {
-    const user = await userModel.findById({ _id: req.body.userId });
-    user.password = undefined;
+    const userId = req.body.userId;
+
+    if (!userId) {
+      return res
+        .status(400)
+        .send({ message: "User ID is missing", success: false });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res
+        .status(400)
+        .send({ message: "Invalid user ID", success: false });
+    }
+
+    const user = await userModel.findById(userId);
+
     if (!user) {
       return res.status(200).send({
-        message: "user not found",
+        message: "User not found",
         success: false,
       });
     } else {
+      user.password = undefined;
       res.status(200).send({
         success: true,
         data: user,
       });
     }
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).send({
       message: "Auth error",
       success: false,
@@ -84,7 +100,11 @@ const authController = async (req, res) => {
 //add Doctor
 const applyDoctorController = async (req, res) => {
   try {
-    const newDoctor = await doctorModel({ ...req.body, status: "pending" });
+    console.log(req.body);
+    const newDoctor = await doctorModel({
+      ...req.body,
+      status: "pending",
+    });
     await newDoctor.save();
     const adminUser = await userModel.findOne({ isAdmin: true });
     const notification = adminUser.notification;
@@ -160,6 +180,25 @@ const deleteAllNotificationController = async (req, res) => {
   }
 };
 
+//GET all doctors
+const getAllDoctorsController = async (req, res) => {
+  try {
+    const doctors = await doctorModel.find({ status: "approved" });
+    res.status(200).send({
+      success: true,
+      message: `Doctor's list fetched succesfully`,
+      data: doctors,
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({
+      success: false,
+      error,
+      message: "Error while fetching Doctors",
+    });
+  }
+};
+
 module.exports = {
   loginController,
   registerController,
@@ -167,4 +206,5 @@ module.exports = {
   applyDoctorController,
   getAllNotificationController,
   deleteAllNotificationController,
+  getAllDoctorsController,
 };
